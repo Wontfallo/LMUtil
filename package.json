@@ -1,0 +1,75 @@
+{
+  "name": "2a-tst-desktop",
+  "version": "1.0.0",
+  "description": "AI Chat Application with High Quality TTS",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder",
+    "preview": "vite preview",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "@lmstudio/sdk": "^1.5.0",
+    "better-sqlite3": "^11.0.0",
+    "bufferutil": "^4.1.0",
+    "fix-path": "^5.0.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.395.0",
+    "pica": "^9.0.1",
+    "prism-react-renderer": "^2.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-syntax-highlighter": "^16.1.0",
+    "utf-8-validate": "^6.0.6",
+    "uuid": "^13.0.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.14.2",
+    "@types/pica": "^9.0.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.0.1",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.13",
+    "vite-plugin-electron": "^0.28.7",
+    "vite-plugin-electron-renderer": "^0.14.5"
+  },
+  "build": {
+    "appId": "com.2atst.desktop",
+    "productName": "2A-TST-Desktop",
+    "directories": {
+      "output": "release_v2"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist_renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "icon-splash.png",
+        "to": "icon-splash.png"
+      },
+      {
+        "from": "electron/services/omnivoice-launcher.py",
+        "to": "omnivoice-launcher.py"
+      }
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon-splash.png"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+Testing edge-tts (NPM)...
+Fetching voices...
+Voices found: 322
+First voice: {
+  Name: 'Microsoft Server Speech Text to Speech Voice (af-ZA, AdriNeural)',
+  ShortName: 'af-ZA-AdriNeural',
+  Gender: 'Female',
+  Locale: 'af-ZA',
+  SuggestedCodec: 'audio-24khz-48kbitrate-mono-mp3',
+  FriendlyName: 'Microsoft Adri Online (Natural) - Afrikaans (South Africa)',
+  Status: 'GA',
+  VoiceTag: {
+    ContentCategories: [ 'General' ],
+    VoicePersonalities: [ 'Friendly', 'Positive' ]
+  }
+}
+Generating TTS...
+TTS Failed: Error: Unexpected server response: 403
+    at ClientRequest.<anonymous> (C:\Users\WontML\dev\2A-TST-Desktop\node_modules\ws\lib\websocket.js:913:7)
+    at ClientRequest.emit (node:events:518:28)
+    at HTTPParser.parserOnIncomingClient (node:_http_client:716:27)
+    at HTTPParser.parserOnHeadersComplete (node:_http_common:117:17)
+    at TLSSocket.socketOnData (node:_http_client:558:22)
+    at TLSSocket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at TLSWrap.onStreamRead (node:internal/stream_base_commons:189:23)

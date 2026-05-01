@@ -1,0 +1,16 @@
+INFO:     Started server process [33960]
+INFO:     Waiting for application startup.
+20:30:31 INFO omnivoice_server.app  omnivoice-server starting up...
+20:30:31 INFO omnivoice_server.app    device=cuda  num_step=32  max_concurrent=2
+20:30:34 INFO omnivoice_server.services.model  Loading model 'k2-fsa/OmniVoice' on cuda...
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   1%|1         | 4/313 [00:00<00:08, 35.65it/s]Loading weights:  90%|########9 | 281/313 [00:00<00:00, 1558.16it/s]Loading weights: 100%|##########| 313/313 [00:00<00:00, 1372.58it/s]
+Fetching 13 files:   0%|          | 0/13 [00:00<?, ?it/s]Fetching 13 files: 100%|##########| 13/13 [00:00<?, ?it/s]
+Loading weights:   0%|          | 0/527 [00:00<?, ?it/s]Loading weights:  62%|######2   | 329/527 [00:00<00:00, 3251.86it/s]Loading weights: 100%|##########| 527/527 [00:00<00:00, 2870.12it/s]
+20:30:36 INFO omnivoice_server.services.model  Model loaded in 2.5s. RAM: 624MB -> 2107MB (+1483MB)
+20:30:36 INFO omnivoice_server.app  Startup complete in 4.8s. Listening on http://127.0.0.1:8880
+INFO:     Application startup complete.
+ERROR:    [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8880): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted
+INFO:     Waiting for application shutdown.
+20:30:36 INFO omnivoice_server.app  Shutting down...
+20:30:36 INFO omnivoice_server.app  Done.
+INFO:     Application shutdown complete.

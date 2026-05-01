@@ -1,0 +1,12 @@
+INFO:     Started server process [51288]
+INFO:     Waiting for application startup.
+01:40:03 INFO omnivoice_server.app  omnivoice-server starting up...
+01:40:03 INFO omnivoice_server.app    device=cuda  num_step=32  max_concurrent=1
+01:40:19 INFO omnivoice_server.services.model  Loading model 'k2-fsa/OmniVoice' on cuda...
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   1%|1         | 4/313 [00:00<00:24, 12.39it/s]Loading weights:  85%|########5 | 267/313 [00:00<00:00, 810.44it/s]Loading weights: 100%|##########| 313/313 [00:00<00:00, 666.35it/s]
+Fetching 13 files:   0%|          | 0/13 [00:00<?, ?it/s]Fetching 13 files: 100%|##########| 13/13 [00:00<?, ?it/s]
+Loading weights:   0%|          | 0/527 [00:00<?, ?it/s]Loading weights:  37%|###7      | 196/527 [00:00<00:00, 1489.03it/s]Loading weights:  65%|######5   | 345/527 [00:00<00:00, 779.54it/s] Loading weights:  83%|########3 | 439/527 [00:00<00:00, 703.87it/s]Loading weights:  98%|#########8| 517/527 [00:00<00:00, 649.90it/s]Loading weights: 100%|##########| 527/527 [00:00<00:00, 717.30it/s]
+01:40:24 INFO omnivoice_server.services.model  Model loaded in 4.2s. RAM: 639MB -> 2099MB (+1460MB)
+01:40:24 INFO omnivoice_server.app  Startup complete in 20.8s. Listening on http://127.0.0.1:8880
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8880 (Press CTRL+C to quit)
