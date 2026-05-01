@@ -1,0 +1,28 @@
+# Node
+node_modules/
+# lockfiles
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+package-lock.json
+# dependencies
+/node_modules/
+
+# build outputs
+dist/
+build/
+dist-electron/
+release_v2/
+*.exe
+*.dll
+*.pak
+*.blockmap
+
+# editor / os
+.DS_Store
+.vscode/
+.idea/
+
+# env
+.env
