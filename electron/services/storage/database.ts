@@ -179,4 +179,19 @@ export function getDb() {
   return db;
 }
 
-export default { initDatabase, getDb };
+export function closeDatabase() {
+  if (!db) {
+    return;
+  }
+
+  try {
+    console.log('[Database] Closing database connection...');
+    db.close();
+    db = null;
+    console.log('[Database] Database connection closed.');
+  } catch (error) {
+    console.error('[Database] Failed to close database connection:', error);
+  }
+}
+
+export default { initDatabase, getDb, closeDatabase };

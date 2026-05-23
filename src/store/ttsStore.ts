@@ -215,7 +215,7 @@ function armSynthesisPressureTimer(request: PendingSynthesisRequest) {
         }
 
         useTTSStore.setState({
-            ttsWarning: 'TTS is still preparing audio. OmniVoice may be starting, busy, or blocked by model memory. Use Oh Shit to abort generation, cancel voice, unload LLMs, and stop OmniVoice.'
+            ttsWarning: 'Voice generation is taking longer than expected. OmniVoice may still be starting, busy, or waiting for GPU memory. Open Runtime Diagnostics in Settings for live backend details, or use Oh Shit to reset voice/model processes.'
         });
     }, TTS_STATUS_NOTICE_MS);
 }
@@ -310,7 +310,7 @@ const processSynthesisQueue = async () => {
                 const latestState = useTTSStore.getState();
                 if (request.session === latestState.generationSession) {
                     useTTSStore.setState({
-                        ttsWarning: `TTS failed: ${error instanceof Error ? error.message : String(error)}`
+                        ttsWarning: `Voice generation failed: ${error instanceof Error ? error.message : String(error)}. Open Runtime Diagnostics in Settings for details.`
                     });
                 }
             } finally {

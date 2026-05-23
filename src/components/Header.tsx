@@ -2,7 +2,13 @@ import React from 'react';
 import { useAppStore } from '../store/appStore.ts';
 import { useChatStore } from '../store/chatStore.ts';
 import { useTTSStore } from '../store/ttsStore.ts';
-import { Cpu, Download, Loader2, RefreshCw, X } from 'lucide-react';
+import { Cpu, Download, Loader2, RefreshCw, Sliders, Terminal, X } from 'lucide-react';
+
+interface HeaderProps {
+    onOpenSettings: () => void;
+    onToggleTerminal: () => void;
+    terminalOpen: boolean;
+}
 
 const getModelLookupTerms = (rawInput: string, normalizedModel?: string): string[] => {
     const terms = new Set<string>();
@@ -61,7 +67,7 @@ const findDownloadedModel = (list: any[], beforeIds: Set<string>, rawInput: stri
     }) || null;
 };
 
-const Header: React.FC = () => {
+const Header: React.FC<HeaderProps> = ({ onOpenSettings, onToggleTerminal, terminalOpen }) => {
     const { provider, model, models, setProvider, setModel, setModels, settingsLoaded, currentView } = useAppStore();
     const { currentConversationId, conversations } = useChatStore();
     const stopTTS = useTTSStore(state => state.stop);
@@ -349,6 +355,22 @@ const Header: React.FC = () => {
 
                     <button className="control-btn" onClick={handleUnloadModel} title="Eject Model from VRAM">
                         <Cpu size={16} />
+                    </button>
+
+                    <button
+                        className={`control-btn ${terminalOpen ? 'active' : ''}`}
+                        onClick={onToggleTerminal}
+                        title={terminalOpen ? 'Hide Live Terminal' : 'Show Live Terminal'}
+                    >
+                        <Terminal size={16} />
+                    </button>
+
+                    <button
+                        className="control-btn"
+                        onClick={onOpenSettings}
+                        title="Open Settings"
+                    >
+                        <Sliders size={16} />
                     </button>
                 </div>
 

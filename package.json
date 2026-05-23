@@ -60,6 +60,10 @@
         "to": "icon-splash.png"
       },
       {
+        "from": "icon.ico",
+        "to": "icon.ico"
+      },
+      {
         "from": "electron/services/omnivoice-launcher.py",
         "to": "omnivoice-launcher.py"
       }
@@ -69,7 +73,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "icon-splash.png"
+      "icon": "icon.ico"
     }
   }
 }

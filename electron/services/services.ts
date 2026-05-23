@@ -3,6 +3,7 @@ import { app, ipcMain } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { emitDiagnostics } from './diagnostics';
 
 type ServiceId = 'ollama' | 'lmstudio' | 'omnivoice';
 type ServiceState = 'starting' | 'ready' | 'failed' | 'not_installed';
@@ -20,6 +21,9 @@ interface ServiceDef {
 }
 
 const processes: Partial<Record<ServiceId, ChildProcess>> = {};
+const inflightStarts: Partial<Record<ServiceId, Promise<void>>> = {};
+let shuttingDown = false;
+
 const serviceStatus: Record<ServiceId, ServiceState> = {
     ollama: 'starting',
     lmstudio: 'starting',
@@ -76,7 +80,7 @@ async function hasEnoughVramForOmniVoice(): Promise<boolean> {
         return true;
     }
 
-    const minFreeMb = Number.parseInt(process.env.OMNIVOICE_MIN_FREE_VRAM_MB || '', 10) || 7000;
+    const minFreeMb = Number.parseInt(process.env.OMNIVOICE_MIN_FREE_VRAM_MB || '', 10) || 2000;
     const freeMb = await getFreeVramMb();
     if (freeMb === null) {
         return true;
@@ -84,6 +88,7 @@ async function hasEnoughVramForOmniVoice(): Promise<boolean> {
 
     if (freeMb < minFreeMb) {
         console.warn(`[Services] Not starting omnivoice: only ${freeMb}MB VRAM free, need at least ${minFreeMb}MB.`);
+        emitDiagnostics('services/omnivoice', 'warn', `Skipped start: ${freeMb}MB free VRAM, ${minFreeMb}MB required.`);
         return false;
     }
 
@@ -205,7 +210,7 @@ const waitForServer = async (
 ): Promise<boolean> => {
     const startTime = Date.now();
 
-    while (Date.now() - startTime < timeoutMs) {
+    while (!shuttingDown && Date.now() - startTime < timeoutMs) {
         try {
             const response = await fetch(url, { signal: AbortSignal.timeout(2_000) });
             if (response.ok) {
@@ -222,7 +227,12 @@ const waitForServer = async (
 };
 
 async function tryStartCommand(service: ServiceDef, commandDef: ServiceCommand): Promise<boolean> {
+    if (shuttingDown) {
+        return false;
+    }
+
     console.log(`[Services] Starting ${service.id}: "${commandDef.command}" ${commandDef.args.join(' ')}`);
+    emitDiagnostics(`services/${service.id}`, 'info', `Starting command: ${commandDef.command} ${commandDef.args.join(' ')}`);
 
     try {
         const child = spawn(commandDef.command, commandDef.args, {
@@ -236,15 +246,25 @@ async function tryStartCommand(service: ServiceDef, commandDef: ServiceCommand):
 
         processes[service.id] = child;
 
+        if (shuttingDown) {
+            await killProcessTree(child);
+            if (processes[service.id] === child) {
+                delete processes[service.id];
+            }
+            return false;
+        }
+
         let spawnFailed = false;
 
         child.once('error', (err) => {
             spawnFailed = true;
             console.error(`[Services] ${service.id} spawn error for "${commandDef.command}":`, err.message);
+            emitDiagnostics(`services/${service.id}`, 'error', `Spawn error: ${err.message}`);
         });
 
         child.once('exit', (code) => {
             console.log(`[Services] ${service.id} process exited with code:`, code);
+            emitDiagnostics(`services/${service.id}`, code === 0 ? 'info' : 'warn', `Process exited with code ${code}`);
             if (processes[service.id] === child) {
                 delete processes[service.id];
                 serviceStatus[service.id] = 'failed';
@@ -255,6 +275,7 @@ async function tryStartCommand(service: ServiceDef, commandDef: ServiceCommand):
             const message = chunk.toString().trim();
             if (message) {
                 console.log(`[Services:${service.id}:stdout] ${message}`);
+                emitDiagnostics(`services/${service.id}`, 'debug', `[stdout] ${message}`);
             }
         });
 
@@ -262,6 +283,7 @@ async function tryStartCommand(service: ServiceDef, commandDef: ServiceCommand):
             const message = chunk.toString().trim();
             if (message) {
                 console.error(`[Services:${service.id}:stderr] ${message}`);
+                emitDiagnostics(`services/${service.id}`, 'warn', `[stderr] ${message}`);
             }
         });
 
@@ -274,13 +296,23 @@ async function tryStartCommand(service: ServiceDef, commandDef: ServiceCommand):
             return false;
         }
 
+        if (shuttingDown) {
+            await killProcessTree(child);
+            if (processes[service.id] === child) {
+                delete processes[service.id];
+            }
+            return false;
+        }
+
         const ready = await waitForServer(service.checkUrl, service.startupTimeoutMs ?? 20_000);
         if (ready) {
             console.log(`[Services] ${service.id} is now ready!`);
+            emitDiagnostics(`services/${service.id}`, 'info', 'Health check passed. Service is ready.');
             return true;
         }
 
         console.log(`[Services] ${service.id} did not become ready after "${commandDef.command}"`);
+        emitDiagnostics(`services/${service.id}`, 'warn', `Health check did not pass after command: ${commandDef.command}`);
         if (processes[service.id] === child) {
             delete processes[service.id];
         }
@@ -292,45 +324,73 @@ async function tryStartCommand(service: ServiceDef, commandDef: ServiceCommand):
         return false;
     } catch (error: any) {
         console.error(`[Services] Failed to start ${service.id} with "${commandDef.command}":`, error?.message);
+        emitDiagnostics(`services/${service.id}`, 'error', `Failed to start: ${error?.message || String(error)}`);
         return false;
     }
 }
 
 const startService = async (service: ServiceDef): Promise<void> => {
+    if (shuttingDown) {
+        return;
+    }
+
+    const existing = inflightStarts[service.id];
+    if (existing) {
+        return existing;
+    }
+
+    const run = (async () => {
+        try {
+            const res = await fetch(service.checkUrl, { signal: AbortSignal.timeout(2_000) });
+            if (res.ok) {
+                console.log(`[Services] ${service.id} is already running.`);
+                serviceStatus[service.id] = 'ready';
+                return;
+            }
+        } catch {
+            // Service not running yet.
+        }
+
+        const commands = getStartCommands(service.id);
+        if (commands.length === 0) {
+            console.log(`[Services] Cannot start ${service.id}: executable not found.`);
+            emitDiagnostics(`services/${service.id}`, 'error', 'Cannot start: executable not found.');
+            serviceStatus[service.id] = 'not_installed';
+            return;
+        }
+
+        if (service.id === 'omnivoice' && !(await hasEnoughVramForOmniVoice())) {
+            serviceStatus[service.id] = 'failed';
+            return;
+        }
+
+        serviceStatus[service.id] = 'starting';
+
+        for (const command of commands) {
+            if (shuttingDown) {
+                return;
+            }
+
+            const ready = await tryStartCommand(service, command);
+            if (ready) {
+                serviceStatus[service.id] = 'ready';
+                emitDiagnostics(`services/${service.id}`, 'info', 'Service reported ready.');
+                return;
+            }
+        }
+
+        serviceStatus[service.id] = service.id === 'omnivoice' ? 'not_installed' : 'failed';
+        emitDiagnostics(`services/${service.id}`, 'error', `All startup commands failed. Status: ${serviceStatus[service.id]}.`);
+    })();
+
+    inflightStarts[service.id] = run;
     try {
-        const res = await fetch(service.checkUrl, { signal: AbortSignal.timeout(2_000) });
-        if (res.ok) {
-            console.log(`[Services] ${service.id} is already running.`);
-            serviceStatus[service.id] = 'ready';
-            return;
-        }
-    } catch {
-        // Service not running yet.
-    }
-
-    const commands = getStartCommands(service.id);
-    if (commands.length === 0) {
-        console.log(`[Services] Cannot start ${service.id}: executable not found.`);
-        serviceStatus[service.id] = 'not_installed';
-        return;
-    }
-
-    if (service.id === 'omnivoice' && !(await hasEnoughVramForOmniVoice())) {
-        serviceStatus[service.id] = 'failed';
-        return;
-    }
-
-    serviceStatus[service.id] = 'starting';
-
-    for (const command of commands) {
-        const ready = await tryStartCommand(service, command);
-        if (ready) {
-            serviceStatus[service.id] = 'ready';
-            return;
+        await run;
+    } finally {
+        if (inflightStarts[service.id] === run) {
+            delete inflightStarts[service.id];
         }
     }
-
-    serviceStatus[service.id] = service.id === 'omnivoice' ? 'not_installed' : 'failed';
 };
 
 export const getServiceStatus = (serviceId: ServiceId): string => {
@@ -388,6 +448,7 @@ export const registerServiceHandlers = () => {
 
 export const startAllServices = () => {
     console.log('[Services] Starting all backend services (non-blocking)...');
+    shuttingDown = false;
 
     SERVICES.forEach(service => {
         startService(service).catch(err => {
@@ -397,6 +458,10 @@ export const startAllServices = () => {
 };
 
 export const startServiceById = async (serviceId: ServiceId): Promise<boolean> => {
+    if (shuttingDown) {
+        return false;
+    }
+
     const service = SERVICES.find(item => item.id === serviceId);
     if (!service) {
         return false;
@@ -441,7 +506,9 @@ export const stopServiceProcess = async (serviceId: ServiceId): Promise<void> =>
 
 export const stopAllServices = async (): Promise<void> => {
     console.log('[Services] Stopping all service processes...');
-    const stops = Object.entries(processes).map(async ([id, child]) => {
+    shuttingDown = true;
+
+    const stops = Object.entries({ ...processes }).map(async ([id, child]) => {
         if (child) {
             await stopServiceProcess(id as ServiceId);
         }

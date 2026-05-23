@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     // Database Methods
     getConversations: () => ipcRenderer.invoke('db:get-conversations'),
     createConversation: (id: string, title: string) => ipcRenderer.invoke('db:create-conversation', id, title),
+    branchConversation: (sourceConversationId: string, targetMessageId: string, newConversationId: string, title?: string) => ipcRenderer.invoke('db:branch-conversation', sourceConversationId, targetMessageId, newConversationId, title),
     deleteConversation: (id: string) => ipcRenderer.invoke('db:delete-conversation', id),
     updateConversationTitle: (id: string, title: string) => ipcRenderer.invoke('db:update-conversation-title', id, title),
     getMessages: (conversationId: string) => ipcRenderer.invoke('db:get-messages', conversationId),
@@ -83,6 +84,16 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     speak: (text: string, voice: string, rate?: string, pitch?: string) => ipcRenderer.invoke('tts:speak', text, voice, rate, pitch),
     cancelTTS: () => ipcRenderer.invoke('tts:cancel'),
     cleanupTTS: () => ipcRenderer.invoke('tts:cleanup'),
+
+    // Diagnostics Methods
+    getDiagnosticsState: () => ipcRenderer.invoke('diagnostics:get-state'),
+    setDiagnosticsEnabled: (enabled: boolean) => ipcRenderer.invoke('diagnostics:set-enabled', enabled),
+    clearDiagnostics: () => ipcRenderer.invoke('diagnostics:clear'),
+    onDiagnosticsEntry: (callback: (entry: any) => void) => {
+        const listener = (_: any, entry: any) => callback(entry)
+        ipcRenderer.on('diagnostics:entry', listener)
+        return () => ipcRenderer.off('diagnostics:entry', listener)
+    },
 
     // File System Methods
     saveAvatar: (base64Data: string, type: 'user' | 'ai') => ipcRenderer.invoke('fs:save-avatar', base64Data, type),

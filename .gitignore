@@ -1,11 +1,12 @@
 # Node
 node_modules/
-# lockfiles
+
+# lockfiles / package managers
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-lock.yaml
-package-lock.json
+
 # dependencies
 /node_modules/
 
@@ -13,11 +14,20 @@ package-lock.json
 dist/
 build/
 dist-electron/
+dist_renderer/
 release_v2/
 *.exe
 *.dll
 *.pak
 *.blockmap
+
+# runtime and generated logs
+*.log
+.logs/
+.omnivoice-start*.log
+
+# generated audio/test outputs
+*.mp3
 
 # editor / os
 .DS_Store

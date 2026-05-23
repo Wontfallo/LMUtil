@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { emitDiagnostics } from '../diagnostics';
 
 type OmniGender = 'Male' | 'Female' | 'Unknown';
 
@@ -268,6 +269,7 @@ export class TTSService {
     }
 
     private async waitForReady(timeoutMs: number = SERVER_READY_TIMEOUT_MS): Promise<void> {
+        emitDiagnostics('tts/omnivoice', 'debug', `Waiting for /health (timeout ${Math.round(timeoutMs / 1000)}s).`);
         const start = Date.now();
 
         while (Date.now() - start < timeoutMs) {
@@ -279,6 +281,7 @@ export class TTSService {
                 });
 
                 if (response.ok) {
+                    emitDiagnostics('tts/omnivoice', 'info', `Service ready after ${Date.now() - start}ms.`);
                     return;
                 }
             } catch {
@@ -328,6 +331,7 @@ export class TTSService {
     }
 
     private async speakClone(text: string, profile: VoiceCloneProfile, rate: string): Promise<TTSAudioPayload> {
+        emitDiagnostics('tts/clone', 'info', `Clone synthesis started (${text.length} chars, profile ${profile.id}).`);
         const audioBuffer = fs.readFileSync(profile.audioPath);
         const formData = new FormData();
 
@@ -355,6 +359,7 @@ export class TTSService {
         const clonedAudioBuffer = Buffer.from(await response.arrayBuffer());
         const mimeType = getMimeType(response.headers.get('content-type'));
         console.log(`[TTS] OmniVoice clone synthesized ${text.length} chars with ${profile.id} in ${Date.now() - startedAt}ms (${clonedAudioBuffer.length} bytes).`);
+        emitDiagnostics('tts/clone', 'info', `Clone synthesis finished in ${Date.now() - startedAt}ms (${clonedAudioBuffer.length} bytes).`);
         return {
             audioBase64: clonedAudioBuffer.toString('base64'),
             mimeType
@@ -363,6 +368,7 @@ export class TTSService {
 
     async transcribeAudioData(audioDataUrl: string): Promise<string> {
         await this.waitForReady();
+        emitDiagnostics('tts/transcription', 'info', 'Reference transcription started.');
 
         const audioBuffer = parseAudioDataUrl(audioDataUrl);
         const formData = new FormData();
@@ -381,6 +387,7 @@ export class TTSService {
         }
 
         const payload = await response.json() as { text?: string };
+        emitDiagnostics('tts/transcription', 'info', 'Reference transcription finished successfully.');
         return (payload.text || '').trim();
     }
 
@@ -391,6 +398,7 @@ export class TTSService {
         }
 
         await this.waitForReady();
+        emitDiagnostics('tts/omnivoice', 'info', `Synthesis requested (${trimmedText.length} chars, voice ${voice}).`);
 
         if (voice.startsWith('clone:')) {
             const profileId = voice.slice('clone:'.length);
@@ -403,6 +411,7 @@ export class TTSService {
 
         const voiceId = normalizeVoiceId(voice);
         const omniVoice = buildOmniVoiceSelector(voiceId, pitch);
+        emitDiagnostics('tts/omnivoice', 'debug', `Voice route: requested=${voice}, normalized=${voiceId}, selector=${omniVoice}.`);
         const startedAt = Date.now();
         const response = await this.fetchWithTimeout(`${this.baseUrl}/v1/audio/speech`, {
             method: 'POST',
@@ -426,6 +435,7 @@ export class TTSService {
         const audioBuffer = Buffer.from(await response.arrayBuffer());
         const mimeType = getMimeType(response.headers.get('content-type'));
         console.log(`[TTS] OmniVoice synthesized ${trimmedText.length} chars in ${Date.now() - startedAt}ms (${audioBuffer.length} bytes).`);
+        emitDiagnostics('tts/omnivoice', 'info', `Synthesis finished in ${Date.now() - startedAt}ms (${audioBuffer.length} bytes).`);
         return {
             audioBase64: audioBuffer.toString('base64'),
             mimeType
@@ -472,6 +482,7 @@ export class TTSService {
             ];
         } catch (error) {
             console.warn('[TTS] Falling back to bundled OmniVoice presets:', error);
+            emitDiagnostics('tts/voices', 'warn', `Remote voices unavailable, using local presets. ${error instanceof Error ? error.message : String(error)}`);
             return [...cloneVoices, ...this.localVoices];
         }
     }

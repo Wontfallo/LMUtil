@@ -3,6 +3,7 @@ import { OllamaProvider } from './ollama';
 import { LMStudioProvider } from './lmstudio';
 import { LLMProvider, Message, ChatConfig } from './types';
 import { switchBackend, unloadAllModels } from '../modelManager';
+import { emitDiagnostics } from '../diagnostics';
 
 export class LLMService {
     private providers: Record<string, LLMProvider> = {
@@ -15,6 +16,7 @@ export class LLMService {
 
     setProvider(provider: 'ollama' | 'lmstudio') {
         console.log('[LLMService] Setting provider to:', provider);
+        emitDiagnostics(`llm/${provider}`, 'info', `Active provider switched to ${provider}.`);
         this.currentProvider = provider;
     }
 
@@ -39,31 +41,44 @@ export class LLMService {
         });
 
         ipcMain.on('llm:chat', async (event, messages: Message[], config: ChatConfig) => {
-            console.log(`[LLM] Starting chat with ${this.currentProvider} (model: ${config.model})`);
+            const providerId = this.currentProvider;
+            const source = `llm/${providerId}`;
+            console.log(`[LLM] Starting chat with ${providerId} (model: ${config.model})`);
+            emitDiagnostics(source, 'info', `Chat request started (model ${config.model}, ${messages.length} messages).`);
 
             // Create new abort controller for this request
             this.abortController = new AbortController();
             const signal = this.abortController.signal;
 
-            const provider = this.providers[this.currentProvider];
+            const provider = this.providers[providerId];
+            const startedAt = Date.now();
+            let firstChunkAt: number | null = null;
             try {
                 let chunkCount = 0;
                 for await (const chunk of provider.chat(messages, config, signal)) {
                     if (signal.aborted) {
                         console.log('[LLM] Chat aborted by user');
+                        emitDiagnostics(source, 'warn', 'Chat aborted by user.');
                         event.reply('llm:chat-chunk', { done: true, aborted: true });
                         break;
+                    }
+                    if (firstChunkAt === null) {
+                        firstChunkAt = Date.now();
+                        emitDiagnostics(source, 'info', `First token after ${firstChunkAt - startedAt}ms.`);
                     }
                     chunkCount++;
                     event.reply('llm:chat-chunk', chunk);
                 }
                 console.log(`[LLM] Chat completed with ${chunkCount} chunks`);
+                emitDiagnostics(source, 'info', `Chat finished: ${chunkCount} chunks in ${Date.now() - startedAt}ms.`);
             } catch (error: any) {
                 if (error.name === 'AbortError' || signal.aborted) {
                     console.log('[LLM] Chat aborted');
+                    emitDiagnostics(source, 'warn', 'Chat aborted (signal).');
                     event.reply('llm:chat-chunk', { done: true, aborted: true });
                 } else {
                     console.error('[LLM] Chat error:', error);
+                    emitDiagnostics(source, 'error', `Chat error: ${error?.message || String(error)}`);
                     event.reply('llm:chat-chunk', { done: true, error: error.message });
                 }
             } finally {
@@ -94,7 +109,9 @@ export class LLMService {
 
         ipcMain.handle('llm:cleanup', async () => {
             console.log('[LLM] Cleaning up (unloading all models from all backends)...');
+            emitDiagnostics('llm/cleanup', 'info', 'Unloading all LLM models from VRAM.');
             await unloadAllModels();
+            emitDiagnostics('llm/cleanup', 'info', 'All LLM models unloaded.');
             return true;
         });
     }

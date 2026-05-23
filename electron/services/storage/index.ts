@@ -24,6 +24,11 @@ export function registerStorageHandlers() {
         }
     });
 
+    ipcMain.handle('db:branch-conversation', async (_, sourceConversationId: string, targetMessageId: string, newConversationId: string, title?: string) => {
+        console.log('[Storage] Branching conversation:', sourceConversationId, 'from message:', targetMessageId);
+        return conversationService.createBranchFromMessage(sourceConversationId, targetMessageId, newConversationId, title);
+    });
+
     ipcMain.handle('db:delete-conversation', async (_, id: string) => {
         console.log('[Storage] Deleting conversation:', id);
         return conversationService.delete(id);

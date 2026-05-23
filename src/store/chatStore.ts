@@ -55,6 +55,16 @@ function isQwenLikeModel(model: string): boolean {
     return /qwen/i.test(model);
 }
 
+function getMessageContentPreview(content: string | any[], maxLength = 42): string {
+    const text = Array.isArray(content)
+        ? content.find((part: any) => part?.type === 'text')?.text || ''
+        : content;
+
+    const singleLine = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!singleLine) return '';
+    return singleLine.length > maxLength ? `${singleLine.slice(0, maxLength).trim()}...` : singleLine;
+}
+
 function applyThinkingMode(history: any[], model: string, mode: 'auto' | 'no_think' | 'think'): any[] {
     if (mode === 'auto') return history;
 
@@ -269,6 +279,7 @@ interface ChatState {
     sendMessage: (content: string, model: string, images?: string[]) => Promise<void>;
     deleteConversation: (id: string) => Promise<void>;
     renameConversation: (id: string, title: string) => Promise<void>;
+    branchConversation: (messageId: string) => Promise<string | null>;
     generateTitle: (conversationId: string, userMsg: string, aiMsg: string, model: string) => Promise<void>;
     editMessage: (messageId: string, content: string | any[], truncateAfter?: boolean) => Promise<void>;
     deleteMessage: (messageId: string) => Promise<void>;
@@ -363,6 +374,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (get().currentConversationId === id) {
             set({ currentConversationId: null, messages: [] });
         }
+    },
+
+    branchConversation: async (messageId) => {
+        const { messages, currentConversationId, isStreaming } = get();
+        if (!currentConversationId || isStreaming) return null;
+
+        const branchPoint = messages.find(message => message.id === messageId);
+        if (!branchPoint) return null;
+
+        const sourceConversation = await window.ipcRenderer.getConversation(currentConversationId);
+        const sourceTitle = sourceConversation?.title || 'Conversation';
+        const preview = getMessageContentPreview(branchPoint.content);
+        const branchTitle = preview
+            ? `${sourceTitle} - branch: ${preview}`
+            : `${sourceTitle} - branch`;
+        const newConversationId = uuidv4();
+
+        await window.ipcRenderer.branchConversation(
+            currentConversationId,
+            messageId,
+            newConversationId,
+            branchTitle
+        );
+
+        await get().loadConversations();
+        const branchMessages = await window.ipcRenderer.getMessages(newConversationId);
+        set({
+            currentConversationId: newConversationId,
+            messages: branchMessages || [],
+        });
+        await useChatSettingsStore.getState().loadSettings(newConversationId);
+
+        return newConversationId;
     },
 
     sendMessage: async (content, model, images) => {

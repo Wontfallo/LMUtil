@@ -1,10 +1,7 @@
-<div style="background-color: #f0f0f0; padding: 10px;">
-
-
 # 2A-TST-Desktop Technical Blueprint
 
 > Complete technical documentation for the AI Chat Desktop Application.  
-> **Last Updated:** 2026-04-26
+> **Last Updated:** 2026-05-23
 
 ---
 
@@ -36,6 +33,8 @@
 - **Per-chat settings** (each conversation stores its own AI name, avatar, system prompt, model parameters, voices)
 - **Prompt Studio** - A specialized prompt generator for Wan 2.2 video and Qwen image models
 - **Vision support** - Image attachments for multimodal models
+- **Chat Branching** - Start a new conversation from any message without mutating the source chat
+- **Runtime Diagnostics** - Optional live terminal for LLM, service, and TTS events
 - **Resizable panels** - Both sidebar and right settings panel
 - **Universal Model Management** - "Eject" functionality to clear VRAM across all providers
 - **Native Context Menu** - Spellcheck and standard clipboard actions throughout the app
@@ -79,6 +78,7 @@
 │   ├── preload.ts               # IPC bridge (contextBridge)
 │   └── services/
 │       ├── services.ts          # Centralized backend startup (Ollama/LM Studio/OmniVoice)
+│       ├── diagnostics.ts       # Optional live runtime diagnostics bus + IPC handlers
 │       ├── omnivoice-launcher.py # Local OmniVoice compatibility launcher
 │       ├── modelManager.ts      # VRAM management, backend switching
 │       ├── llm/
@@ -105,9 +105,10 @@
 │   │   ├── Sidebar.tsx          # Conversation list + view switcher
 │   │   ├── ChatInterface.tsx    # Chat view container
 │   │   ├── ChatInput.tsx        # Message input + image upload
-│   │   ├── MessageList.tsx      # Message display + TTS controls
+│   │   ├── MessageList.tsx      # Message display, branching, TTS controls
 │   │   ├── RightPanel.tsx       # Per-chat settings editor
 │   │   ├── Settings.tsx         # Global settings modal
+│   │   ├── DiagnosticsTerminal.tsx # Floating live backend terminal
 │   │   └── PromptGenerator.tsx  # Prompt Studio view
 │   └── store/
 │       ├── appStore.ts          # Global settings (theme, provider, model)
@@ -117,10 +118,19 @@
 │       └── promptGeneratorStore.ts # Prompt Studio state + history
 │
 ├── index.html                   # Vite entry
+├── docs/                        # Product notes and non-runtime docs
+├── tools/legacy/                # Archived standalone browser tools
+├── tests/legacy-tts/            # Archived/manual TTS experiments
+├── archive/design-artifacts/    # Archived visual artifacts not used at runtime
 ├── package.json
+├── package-lock.json            # Tracked for reproducible installer builds
 ├── tsconfig.json
 └── vite.config.ts
 ```
+
+### Repository Hygiene
+
+`node_modules/`, `.logs/`, `dist-electron/`, `dist_renderer/`, `build/`, and `release_v2/` are generated or machine-local outputs and are intentionally ignored. The installer is built locally into `release_v2/`, but the repository should stay source-first: rebuild with `npm install` and `npm run build` instead of committing generated dependency/build folders.
 
 ---
 
@@ -215,7 +225,7 @@ CREATE TABLE conversations (
 CREATE TABLE messages (
     id TEXT PRIMARY KEY,
     conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
-    parent_id TEXT REFERENCES messages(id) ON DELETE CASCADE,  -- For branching (unused)
+    parent_id TEXT REFERENCES messages(id) ON DELETE CASCADE,  -- Lineage for retry/delete/branch copies
     role TEXT CHECK(role IN ('user', 'assistant', 'system', 'tool')),
     content TEXT,               -- String or JSON array for multimodal
     model TEXT,                 -- Model that generated this message
@@ -234,6 +244,7 @@ CREATE TABLE settings (
     value TEXT
 );
 -- Used for: theme, provider, model (global settings only)
+-- Also used for diagnosticsEnabled so the live backend terminal preference persists.
 ```
 
 #### `documents` (Future RAG)
@@ -473,11 +484,13 @@ cleanupLLM(): Promise<void>
 // Database Methods
 getConversations(): Promise<Conversation[]>
 createConversation(id: string, title: string): Promise<void>
+branchConversation(sourceConversationId: string, targetMessageId: string, newConversationId: string, title?: string): Promise<void>
 deleteConversation(id: string): Promise<void>
 updateConversationTitle(id: string, title: string): Promise<void>
 getMessages(conversationId: string): Promise<MessageNode[]>
 saveMessage(message: any): Promise<void>
 deleteMessageBranch(messageId: string): Promise<void>
+updateMessageContent(messageId: string, content: string | any[], truncateAfter?: boolean): Promise<void>
 getSettings(): Promise<Record<string, string>>
 setSetting(key: string, value: string): Promise<void>
 getConversation(id: string): Promise<Conversation>  // Full row with settings
@@ -497,6 +510,12 @@ createCloneProfileFromAudioData(name, audioDataUrl, extension?, refText?): Promi
 deleteCloneProfile(profileId): Promise<boolean>
 speak(text, voice, rate?, pitch?): Promise<{ audioBase64: string; mimeType: string }>
 cleanupTTS(): Promise<void>
+
+// Diagnostics Methods
+getDiagnosticsState(): Promise<{ enabled: boolean; entries: DiagnosticsEntry[] }>
+setDiagnosticsEnabled(enabled: boolean): Promise<boolean>
+clearDiagnostics(): Promise<boolean>
+onDiagnosticsEntry(callback): () => void
 
 // File System Methods
 saveAvatar(base64Data, type: 'user' | 'ai'): Promise<string>
@@ -621,7 +640,7 @@ TTS is handled by a local OmniVoice HTTP server, started by the Electron main pr
 
 **Known-good Windows environment:** The app venv should match the standalone Gradio demo that works from `H:\OmniVoice\.venv`. In practice that means `.omnivoice` uses an editable install of the local `H:\OmniVoice` checkout (`omnivoice==0.1.2`, `transformers==5.3.0`) instead of drifting to newer PyPI behavior. `torchcodec` is intentionally **not** installed in this venv; installing it caused the clone/ASR path to choose a broken Windows FFmpeg DLL loader even though the standalone demo works without TorchCodec.
 
-**VRAM guardrails:** LM Studio context length is capped to `32768` by default when loading through the app, even if a model advertises a much larger maximum context. Override with `LMSTUDIO_MAX_CONTEXT_LENGTH` only when there is enough VRAM. OmniVoice CUDA startup checks free VRAM and refuses to start if less than `7000 MB` is available; override with `OMNIVOICE_MIN_FREE_VRAM_MB` if needed.
+**VRAM guardrails:** LM Studio context length is capped to `32768` by default when loading through the app, even if a model advertises a much larger maximum context. Override with `LMSTUDIO_MAX_CONTEXT_LENGTH` only when there is enough VRAM. OmniVoice CUDA startup checks free VRAM and refuses to start if less than `2000 MB` is available; override with `OMNIVOICE_MIN_FREE_VRAM_MB` if needed. (The OmniVoice model itself loads in ~1.5 GB, so this gate exists only to avoid OOM when an LLM has eaten almost all VRAM.)
 
 The app launches OmniVoice with:
 
@@ -948,6 +967,30 @@ This prevents LM Studio or Ollama from keeping the previous model in VRAM while 
 7. If conversation has different last_model, show switch prompt
 ```
 
+### Branching a Conversation
+
+```
+1. User clicks "Branch" on any message in MessageList
+2. chatStore.branchConversation(messageId) creates a new UUID and branch title
+3. Renderer calls db:branch-conversation through preload
+4. conversationService.createBranchFromMessage() copies the source conversation settings
+5. It copies all messages up to the selected row into the new conversation
+6. Message IDs are remapped and parent_id values are rewired to the copied IDs
+7. The original conversation remains unchanged
+8. chatStore loads the new branch messages, switches currentConversationId, and loads branch settings
+```
+
+### Runtime Diagnostics
+
+```
+1. User clicks the Terminal icon in Header
+2. Layout opens DiagnosticsTerminal
+3. DiagnosticsTerminal reads diagnostics:get-state and subscribes to diagnostics:entry
+4. The logging toggle calls diagnostics:set-enabled and persists diagnosticsEnabled in settings
+5. LLM, service startup/shutdown, and TTS paths call emitDiagnostics()
+6. Diagnostics entries are kept in memory only; logs are not written to the repo
+```
+
 ### Saving Per-Chat Settings
 
 ```
@@ -1004,7 +1047,7 @@ This prevents LM Studio or Ollama from keeping the previous model in VRAM while 
 ## Future Considerations
 
 1. **RAG/Documents** - `documents` table exists but unused
-2. **Message branching** - `parent_id` in messages supports tree structure
+2. **Branch tree navigation** - Branch creation works, but the UI currently lists branches as normal conversations rather than showing a visual branch graph
 3. **Tool calling** - `tool_calls`/`tool_result` columns ready
 4. **Theme switching** - `theme` setting exists but UI may not fully implement
 
@@ -1065,7 +1108,17 @@ This prevents LM Studio or Ollama from keeping the previous model in VRAM while 
 - **Cause**: `electron-builder` or OS processes may hold stubborn locks on unpacked resources, especially if a previous build crashed or the app was running.
 - **Solution**:
   - **Immediate**: Rename the output directory (e.g., `release_v2`) in `package.json` to bypass the locked folder.
-  - **Prevention**: Ensure `build.files` configuration in `package.json` explicitly includes build artifacts (`dist`, `dist-electron`) to prevent builder confusion.
+  - **Prevention**: Ensure `build.files` configuration in `package.json` explicitly includes build artifacts (`dist_renderer`, `dist-electron`) to prevent builder confusion.
+
+#### 4. Build Artifacts in Git
+
+- **Symptom**: Small source changes produce huge diffs because `node_modules`, `dist-electron`, `dist_renderer`, logs, or installer outputs are tracked.
+- **Cause**: Generated dependency and build folders were previously committed even though they are machine-local outputs.
+- **Solution**:
+  - Keep `package-lock.json` tracked for reproducible installs.
+  - Keep `node_modules/`, `dist-electron/`, `dist_renderer/`, `.logs/`, and `release_v2/` ignored.
+  - Build artifacts locally with `npm run build`; the installer appears in `release_v2/`.
+  - Keep root-level one-off scripts out of the app root: legacy TTS experiments live in `tests/legacy-tts/`, standalone HTML tools in `tools/legacy/`, and non-runtime images in `archive/design-artifacts/`.
 
 ### Security & File Access (Character Cards)
 
@@ -1268,5 +1321,3 @@ This prevents LM Studio or Ollama from keeping the previous model in VRAM while 
   - **Image Storage**: Images are stored directly in the SQLite database as base64 strings within a JSON array. While not suitable for massive datasets, this is efficient for small prompt attachments (mockups, reference images) in a local desktop app context.
   - **Sidebar Location**: The Prompt Library was explicitly moved to the left global sidebar to replace the chat history when in Prompt Studio mode, providing a cleaner layout than a 3-column design.
   - **CSS Styling**: Custom styles in `index.css` under `.prompt-library` ensure the component blends with the application's sidebar theme (transparent backgrounds, hover effects, consistent typography).
-Your text here
-</div>Copied!   

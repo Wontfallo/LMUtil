@@ -3,13 +3,15 @@ import path from 'node:path';
 
 // Import services
 import { LLMService } from './services/llm';
-import { initDatabase } from './services/storage/database';
+import { closeDatabase, initDatabase } from './services/storage/database';
 import { registerStorageHandlers } from './services/storage';
 import { registerTTSHandlers } from './services/tts';
 import { registerFileSystemHandlers } from './services/storage/fileSystem';
+import { registerDiagnosticsHandlers, setDiagnosticsEnabled } from './services/diagnostics';
 import { startAllServices, registerServiceHandlers, stopAllServices } from './services/services';
 import { setMainWindowForLMStudio } from './services/llm/lmstudio';
 import { unloadAllModels } from './services/modelManager';
+import { settingsService } from './services/storage/settings';
 
 // __dirname is available in CJS output
 declare const __dirname: string;
@@ -37,6 +39,16 @@ let splash: BrowserWindow | null = null;
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 let quitCleanupComplete = false;
 
+const getResourcePath = (fileName: string) => app.isPackaged
+    ? path.join(process.resourcesPath, fileName)
+    : path.join(__dirname, '..', fileName);
+
+const getAppIconPath = () => app.isPackaged
+    ? getResourcePath('icon.ico')
+    : path.join(__dirname, '..', 'icon.ico');
+
+const getSplashImagePath = () => getResourcePath('icon-splash.png');
+
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T | null> => {
     let timeout: NodeJS.Timeout | null = null;
     try {
@@ -61,14 +73,13 @@ const cleanupBeforeQuit = async () => {
 
     await withTimeout(unloadAllModels(), 15_000, 'LLM model unload');
     await withTimeout(stopAllServices(), 8_000, 'service shutdown');
+    closeDatabase();
 
     console.log('[Main] Quit cleanup finished.');
 };
 
 function createSplashWindow(): BrowserWindow {
-    const splashPath = app.isPackaged
-        ? path.join(process.resourcesPath, 'icon-splash.png')
-        : path.join(__dirname, '../icon-splash.png');
+    const splashPath = getSplashImagePath();
 
     console.log('[Main] Creating splash window with image:', splashPath);
 
@@ -125,11 +136,9 @@ function createWindow() {
     win = new BrowserWindow({
         width: 1200,
         height: 800,
-        // backgroundColor: '#0c0c0e', // Removed for debugging
-        show: true, // Show immediately to see any startup errors
-        icon: app.isPackaged
-            ? path.join(process.resourcesPath, 'icon-splash.png')
-            : path.join(__dirname, '../icon-splash.png'),
+        backgroundColor: '#0c0c0e',
+        show: false,
+        icon: getAppIconPath(),
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
             contextIsolation: true,
@@ -150,7 +159,7 @@ function createWindow() {
             splash.close();
             splash = null;
         }
-        // Window already shown
+        win?.show();
     });
 
 
@@ -246,6 +255,10 @@ app.whenReady().then(() => {
     registerStorageHandlers();
     registerTTSHandlers();
     registerFileSystemHandlers();
+    registerDiagnosticsHandlers();
+
+    const diagnosticsEnabled = settingsService.get('diagnosticsEnabled') === 'true';
+    setDiagnosticsEnabled(diagnosticsEnabled);
 
     const llmService = new LLMService();
     llmService.registerHandlers();

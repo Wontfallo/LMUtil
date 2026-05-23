@@ -404,6 +404,259 @@ body {
     height: 100px;
 }
 
+.setting-group.diagnostics-controls {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.setting-group.diagnostics-controls small {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+}
+
+.diag-clear-btn {
+    border: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 0.4rem 0.65rem;
+    cursor: pointer;
+}
+
+.diag-clear-btn:hover {
+    border-color: var(--accent);
+}
+
+.diagnostics-log {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #0a0f14;
+    padding: 0.55rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.diagnostics-empty {
+    color: var(--text-secondary);
+    padding: 0.4rem;
+}
+
+.diagnostics-line {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.2rem 0.25rem;
+    border-radius: 6px;
+}
+
+.diag-time {
+    color: #93c5fd;
+}
+
+.diag-source {
+    color: #c4b5fd;
+}
+
+.diag-message {
+    color: #d1d5db;
+    overflow-wrap: anywhere;
+}
+
+.diagnostics-line.level-warn {
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.diagnostics-line.level-error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Floating Diagnostics Terminal */
+.diagnostics-terminal {
+    position: fixed;
+    z-index: 1500;
+    background: #0a0f14;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 360px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.diagnostics-terminal.minimized {
+    height: 40px !important;
+    min-width: 240px;
+}
+
+.diag-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.7rem;
+    background: linear-gradient(180deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.05));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.diag-header:active {
+    cursor: grabbing;
+}
+
+.diag-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: #e5e7eb;
+}
+
+.diag-led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 0.25rem;
+    background: #475569;
+}
+
+.diag-led.on {
+    background: #22d3ee;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.65);
+}
+
+.diag-header-actions {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.diag-icon-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e5e7eb;
+    border-radius: 6px;
+    padding: 0.2rem 0.35rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.diag-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--accent);
+}
+
+.diag-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    font-size: 0.72rem;
+}
+
+.diag-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #cbd5f5;
+}
+
+.diag-filter-group {
+    display: inline-flex;
+    gap: 0.2rem;
+}
+
+.diag-filter-btn {
+    padding: 0.2rem 0.45rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.7rem;
+}
+
+.diag-filter-btn.active {
+    background: rgba(124, 58, 237, 0.25);
+    color: white;
+    border-color: var(--accent);
+}
+
+.diag-spacer {
+    flex: 1;
+}
+
+.diag-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
+.diag-empty {
+    color: #64748b;
+    padding: 0.4rem;
+}
+
+.diag-line {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.5rem;
+    padding: 0.15rem 0.25rem;
+    border-radius: 5px;
+    align-items: baseline;
+}
+
+.diag-line.level-warn {
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.diag-line.level-error {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.diag-line .diag-time {
+    color: #93c5fd;
+}
+
+.diag-line .diag-source {
+    color: #c4b5fd;
+}
+
+.diag-line .diag-message {
+    color: #d1d5db;
+    overflow-wrap: anywhere;
+}
+
+.diag-resize-handle {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.25) 50%);
+    border-bottom-right-radius: 12px;
+}
+
+.control-btn.active {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: var(--accent);
+    color: white;
+}
+
 /* Main Content Styling */
 .main-content {
     flex: 1;
@@ -1120,6 +1373,12 @@ body {
     background: rgba(59, 130, 246, 0.2);
     border-color: #3b82f6;
     color: #3b82f6;
+}
+
+.msg-action-btn.branch:hover {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: #22c55e;
+    color: #22c55e;
 }
 
 /* ============================================
@@ -2072,6 +2331,11 @@ body {
 .msg-action-btn.edit:hover {
     border-color: #3b82f6;
     color: #3b82f6;
+}
+
+.msg-action-btn.branch:hover {
+    border-color: #22c55e;
+    color: #22c55e;
 }
 
 .msg-action-btn.delete:hover {

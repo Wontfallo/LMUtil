@@ -30,6 +30,7 @@ interface Window {
         // Database Methods
         getConversations: () => Promise<any[]>;
         createConversation: (id: string, title: string) => Promise<any>;
+        branchConversation: (sourceConversationId: string, targetMessageId: string, newConversationId: string, title?: string) => Promise<any>;
         deleteConversation: (id: string) => Promise<any>;
         updateConversationTitle: (id: string, title: string) => Promise<any>;
         getConversation: (id: string) => Promise<any>;
@@ -63,6 +64,12 @@ interface Window {
         speak: (text: string, voice: string, rate?: string, pitch?: string) => Promise<{ audioBase64: string; mimeType: string }>;
         cancelTTS: () => Promise<boolean>;
         cleanupTTS: () => Promise<void>;
+
+        // Diagnostics Methods
+        getDiagnosticsState: () => Promise<{ enabled: boolean; entries: Array<{ id: number; timestamp: string; source: string; level: 'debug' | 'info' | 'warn' | 'error'; message: string }> }>;
+        setDiagnosticsEnabled: (enabled: boolean) => Promise<boolean>;
+        clearDiagnostics: () => Promise<boolean>;
+        onDiagnosticsEntry: (callback: (entry: { id: number; timestamp: string; source: string; level: 'debug' | 'info' | 'warn' | 'error'; message: string }) => void) => () => void;
 
         // File System Methods
         saveAvatar: (base64Data: string, type: 'user' | 'ai') => Promise<string>;

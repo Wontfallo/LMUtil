@@ -3,7 +3,7 @@ import { useChatStore } from '../store/chatStore.ts';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Sparkles, Volume2, Play, Pause, Square, Copy, Check, Download, RefreshCw, ArrowRight, Pencil, Trash2, Save, X } from 'lucide-react';
+import { User, Sparkles, Volume2, Play, Pause, Square, Copy, Check, Download, RefreshCw, ArrowRight, Pencil, Trash2, Save, X, GitBranch } from 'lucide-react';
 import { useTTSStore } from '../store/ttsStore.ts';
 import { useAppStore } from '../store/appStore.ts';
 
@@ -83,7 +83,7 @@ const setMessageText = (content: string | any[], text: string): string | any[] =
 };
 
 const MessageList: React.FC = () => {
-    const { messages, currentConversationId, loadMessages, editMessage, deleteMessage, retryMessage, continueResponse, isStreaming } = useChatStore();
+    const { messages, currentConversationId, loadMessages, editMessage, deleteMessage, retryMessage, continueResponse, branchConversation, isStreaming } = useChatStore();
     const { model, models } = useAppStore();
     const { play, pause, resume, stop, isPlaying, isPaused, currentMessageId } = useTTSStore();
     const { current: chatSettings, loadSettings } = useChatSettingsStore();
@@ -184,6 +184,11 @@ const MessageList: React.FC = () => {
 
         if (editingId === msg.id) cancelEditing();
         await deleteMessage(msg.id);
+    };
+
+    const handleBranch = async (msg: any) => {
+        if (editingId === msg.id) cancelEditing();
+        await branchConversation(msg.id);
     };
 
     useEffect(() => {
@@ -364,6 +369,13 @@ const MessageList: React.FC = () => {
                                         title="Edit message"
                                     >
                                         <Pencil size={12} /> Edit
+                                    </button>
+                                    <button
+                                        className="msg-action-btn branch"
+                                        onClick={() => handleBranch(msg)}
+                                        title="Start a new chat from here"
+                                    >
+                                        <GitBranch size={12} /> Branch
                                     </button>
                                     <button
                                         className="msg-action-btn delete"
